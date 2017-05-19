@@ -2,18 +2,17 @@
 #include <time.h>
 
 int field[70][70] = {0};
-int heights[71] = {0};
 int squares[24] = {0};
 
-#ifdef VERBOSE_TO_FILE
-FILE* fout;
-#endif
+int verbose = 0;
+FILE* fout = NULL;
+
 
 void print_field(FILE* str)
 {
     // Выводит текущее поле в поток str, внутренние квадраты обозначены латинскими буквами
     static const char codetable[] = " ABCDEFGHIJKLMNOPQRSTUVWX";
-    fprintf(str, "----------------------------------------------------------------------\n");
+    fprintf(str, "------------------------------------------------------------------------\n");
     for (int i = 0; i < 70; ++i) {
         fprintf(str, "|");
         for (int j = 0; j < 70; ++j) {
@@ -21,8 +20,9 @@ void print_field(FILE* str)
         }
         fprintf(str, "|\n");
     }
-    fprintf(str, "----------------------------------------------------------------------\n");
+    fprintf(str, "------------------------------------------------------------------------\n");
 }
+
 
 int add_square(int x, int y, int size)
 {
@@ -41,6 +41,9 @@ int add_square(int x, int y, int size)
         }
     }
     squares[size - 1] = 1;
+    if (verbose) {
+        print_field(fout);
+    }
     return 1;
 }
 
@@ -53,74 +56,62 @@ void remove_square(int x, int y, int size)
         }
     }
     squares[size - 1] = 0;
+    if (verbose) {
+        print_field(fout);
+    }
 }
 
-void count_heights()
-{
-    // Заполняет массив heights высотами каждого столбца
-    int s = 0;
-    for (int i = 0; i < 70; ++i) {
-        if (s == 70) {
-            --s;
-        }
-        while (s > 0 && field[s][i] == 0) {
-            --s;
-        }
-        while (s < 70 && field[s][i] != 0) {
-            ++s;
-        }
-        heights[i] = s;
-    }
-    heights[70] = 70;
-}
 
 void min_valley(int *x, int *y)
 {
     // Находит наименее широкую яму, помещает координаты её левого верхнего угла в x, y
-    count_heights();
-    int mvw = 71, mvh = 71;
-    int b = 70, c = 70;
-    int bi = -1, ci = -1;
+    int height = 0;
+    int minwidth = 71;
+    int depth = 70;
+    int border_i = -1;
     int down = 0;
     for (int i = 0; i < 71; ++i) {
-        if (heights[i] == c) {
-            ci = i;
-        } else if (heights[i] < c) {
-            down = 1;
-            b = c;
-            c = heights[i];
-            bi = ci;
-            ci = i;
+        if (i == 70) {
+            height = 70;
         } else {
+            if (height == 70) {
+                --height;
+            }
+            while (height > 0 && field[height][i] == 0) {
+                --height;
+            }
+            while (height < 70 && field[height][i] != 0) {
+                ++height;
+            }
+        }
+        if (height < depth) {
+            down = 1;
+            depth = height;
+            border_i = i - 1;
+        } else if (height > depth) {
             if (down) {
                 down = 0;
-                // c - top
-                // bi+1 - left
-                // (min(b, heights[i]) - bottom
+                // depth - top
+                // border_i+1 - left
+                // (min(border, height) - bottom
                 // i - right
-                int vw = i - (bi + 1);
-                if (vw <= mvw) {
-                    int vh = (b < heights[i] ? b : heights[i]) - c;
-                    if (vw < mvw || vh < mvh) {
-                        mvw = vw;
-                        mvh = vh;
-                        *x = c;
-                        *y = bi + 1;
-                    }
+                int width = i - (border_i + 1);
+                if (width < minwidth) {
+                    minwidth = width;
+                    *x = depth;
+                    *y = border_i + 1;
                 }
             }
-            b = c = heights[i];
-            bi = ci = i;
+            depth = height;
+            border_i = i;
         }
     }
 }
 
+
 int solve()
 {
     // Рекурсивная функция для поиска решения.
-#ifdef VERBOSE_TO_FILE
-    print_field(fout);
-#endif
     int solved = 1;
     int x = -1, y = -1;
     min_valley(&x, &y);
@@ -141,21 +132,27 @@ int solve()
     return solved;
 }
 
-int main()
+
+int main(int argc, char const *argv[])
 {
 
-#ifdef VERBOSE_TO_FILE
-    fout = fopen("l2out_c", "w");
-#endif
+    if (argc == 2 && argv[1][0] == 'v') {
+        verbose = 1;
+        fout = fopen("l2out_c.txt", "w");
+    }
 
     time_t start_time = time(0);
     fprintf(stdout, "Program started at %s", ctime(&start_time));
+
+    if (verbose) {
+        print_field(fout);
+    }
 
     if (solve()) {
         fprintf(stdout, "Solution found:\n");
         print_field(stdout);
     } else {
-        fprintf(stdout, "Solution does not exist:\n");
+        fprintf(stdout, "Solution does not exist\n");
     }
 
     time_t end_time = time(0);
