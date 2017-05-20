@@ -1,8 +1,9 @@
 #include <stdio.h>
+#include <stdbool.h>
 #include <time.h>
 
 int field[70][70] = {0};
-int squares[24] = {0};
+bool squares[24] = {0};
 
 int verbose = 0;
 FILE* fout = NULL;
@@ -11,12 +12,12 @@ FILE* fout = NULL;
 void print_field(FILE* str)
 {
     // Выводит текущее поле в поток str, внутренние квадраты обозначены латинскими буквами
-    static const char codetable[] = " ABCDEFGHIJKLMNOPQRSTUVWX";
+    static const char charmap[] = " ABCDEFGHIJKLMNOPQRSTUVWX";
     fprintf(str, "------------------------------------------------------------------------\n");
     for (int i = 0; i < 70; ++i) {
         fprintf(str, "|");
         for (int j = 0; j < 70; ++j) {
-            fprintf(str, "%c", codetable[field[i][j]]);
+            fputc(charmap[field[i][j]], str);
         }
         fprintf(str, "|\n");
     }
@@ -24,15 +25,15 @@ void print_field(FILE* str)
 }
 
 
-int add_square(int x, int y, int size)
+bool add_square(int x, int y, int size)
 {
     // Проверяет можно ли поставить квадрат размером size на поле так, чтобы его левый верхний угол был на x, y
     // И ставит его, если это вохможно
     // Возвращает - удалось ли поставить квадрат
-    if (x + size > 70 || y + size > 70) { return 0; }
+    if (x + size > 70 || y + size > 70) { return false; }
     for (int i = x; i < x + size; ++i) {
         for (int j = y; j < y + size; ++j) {
-            if (field[i][j] != 0) { return 0; }
+            if (field[i][j] != 0) { return false; }
         }
     }
     for (int i = x; i < x + size; ++i) {
@@ -40,11 +41,11 @@ int add_square(int x, int y, int size)
             field[i][j] = size;
         }
     }
-    squares[size - 1] = 1;
+    squares[size - 1] = true;
     if (verbose) {
         print_field(fout);
     }
-    return 1;
+    return true;
 }
 
 void remove_square(int x, int y, int size)
@@ -55,7 +56,7 @@ void remove_square(int x, int y, int size)
             field[i][j] = 0;
         }
     }
-    squares[size - 1] = 0;
+    squares[size - 1] = false;
     if (verbose) {
         print_field(fout);
     }
@@ -69,7 +70,7 @@ void min_valley(int *x, int *y)
     int minwidth = 71;
     int depth = 70;
     int border_i = -1;
-    int down = 0;
+    bool down = false;
     for (int i = 0; i < 71; ++i) {
         if (i == 70) {
             height = 70;
@@ -85,51 +86,44 @@ void min_valley(int *x, int *y)
             }
         }
         if (height < depth) {
-            down = 1;
+            down = true;
             depth = height;
-            border_i = i - 1;
+            border_i = i;
         } else if (height > depth) {
             if (down) {
-                down = 0;
-                // depth - top
-                // border_i+1 - left
-                // (min(border, height) - bottom
-                // i - right
+                down = false;
                 int width = i - (border_i + 1);
                 if (width < minwidth) {
                     minwidth = width;
                     *x = depth;
-                    *y = border_i + 1;
+                    *y = border_i;
                 }
             }
             depth = height;
-            border_i = i;
         }
     }
 }
 
 
-int solve()
+bool solve()
 {
     // Рекурсивная функция для поиска решения.
-    int solved = 1;
     int x = -1, y = -1;
     min_valley(&x, &y);
     if (x == -1 || y == -1) {
-        return 1;
+        return true;
     }
     for (int n = 24; n > 0; --n) {
         if (!squares[n - 1]) {
-            solved = 0;
             if (add_square(x, y, n)) {
                 if (solve()) {
-                    return 1;
+                    return true;
                 }
                 remove_square(x, y, n);
             }
         }
     }
-    return solved;
+    return false;
 }
 
 
